@@ -34,9 +34,8 @@ export function Sidebar() {
         collapsed ? "-translate-x-full w-72 lg:w-20" : "translate-x-0 w-72",
       )}>
         {/* Logo */}
-        <div className="flex items-center justify-between px-6 py-6 border-b border-border/50 h-24">
+        <div className={cn("flex items-center px-6 py-6 border-b border-border/50 h-24", collapsed ? "justify-center px-0" : "justify-between")}>
           {!collapsed && <img src="/logo.png" alt="Company Logo" className="w-auto h-12 object-contain" />}
-          {collapsed && <div className="w-8 h-8 rounded-full bg-[var(--color-brand-blue)] flex items-center justify-center text-white font-bold text-xs">UT</div>}
           <button 
             onClick={() => setCollapsed(!collapsed)} 
             className="hidden lg:flex p-1.5 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
