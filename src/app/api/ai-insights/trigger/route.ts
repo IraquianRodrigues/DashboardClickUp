@@ -15,7 +15,7 @@ export async function GET() {
     // Fetch all tasks from ClickUp
     const client = getClickUpClient();
     const [tasks, spaces] = await Promise.all([
-      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }, 200),
+      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }, 10),
       client.getSpaces(),
     ]);
 

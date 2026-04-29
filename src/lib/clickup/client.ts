@@ -66,6 +66,11 @@ export class ClickUpClient {
           await new Promise(resolve => setTimeout(resolve, retryAfter));
           continue;
         }
+        // Retry on transient server errors (502, 503, 504)
+        if ([502, 503, 504].includes(response.status) && attempt < retries) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 2000));
+          continue;
+        }
         if (!response.ok) {
           const body = await response.text();
           throw new ClickUpClientError(`ClickUp API error: ${response.status} — ${body}`, response.status, endpoint);
