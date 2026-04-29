@@ -8,13 +8,42 @@ import { useMemo } from "react";
 const POLLING_INTERVAL = parseInt(process.env.NEXT_PUBLIC_POLLING_INTERVAL || "30000");
 
 async function fetchAllTasks(): Promise<ClickUpTask[]> {
-  const sp = new URLSearchParams();
-  sp.set("include_closed", "true");
-  sp.set("subtasks", "true");
+  let page = 0;
+  let lastPage = false;
+  const allTasks: ClickUpTask[] = [];
+  
+  // Maximum safeguard to prevent infinite loops (e.g. 500 pages = 50,000 tasks)
+  const MAX_PAGES = 500;
 
-  const res = await fetch(`/api/clickup/tasks/all?${sp.toString()}&_t=${Date.now()}`);
-  if (!res.ok) throw new Error("Failed to fetch all tasks");
-  return res.json();
+  while (!lastPage && page < MAX_PAGES) {
+    // Fetch up to 5 pages in parallel to speed things up
+    const batchPromises = [];
+    for (let i = 0; i < 5 && page < MAX_PAGES; i++, page++) {
+      const sp = new URLSearchParams();
+      sp.set("include_closed", "true");
+      sp.set("subtasks", "true");
+      sp.set("page", String(page));
+      
+      batchPromises.push(
+        fetch(`/api/clickup/tasks/all?${sp.toString()}&_t=${Date.now()}`).then(res => {
+          if (!res.ok) throw new Error(`Failed to fetch tasks page ${page}`);
+          return res.json();
+        })
+      );
+    }
+    
+    const results = await Promise.all(batchPromises);
+    for (const result of results) {
+      if (result.tasks && Array.isArray(result.tasks)) {
+        allTasks.push(...result.tasks);
+      }
+      if (result.lastPage === true) {
+        lastPage = true;
+      }
+    }
+  }
+  
+  return allTasks;
 }
 
 export function useClickUpTasks() {
