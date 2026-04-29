@@ -86,11 +86,12 @@ export async function GET() {
       callback_url: "https://empreendexpertdashboard.vercel.app/api/ai-insights/callback",
       date: dateStr,
       timestamp: now.toISOString(),
-      prompt: `Você é um analista sênior de projetos e gerenciamento de equipe. Analise os dados abaixo do nosso sistema de gestão de tarefas (ClickUp) e forneça um relatório de insights em português brasileiro.
+      prompt: `Você é um analista sênior de projetos e gerenciamento de equipe. Analise os dados brutos abaixo extraídos em tempo real do nosso sistema de gestão de tarefas (ClickUp) e forneça um relatório de insights em português brasileiro.
 
-DADOS DO DIA: ${dateStr}
+DADOS EXTRAÍDOS EM: ${now.toISOString()}
 
-📊 MÉTRICAS GERAIS:
+[INÍCIO DOS DADOS DO CLICKUP]
+Métricas Gerais:
 - Total de tarefas: ${metrics.total}
 - Concluídas: ${metrics.completed} (${metrics.total > 0 ? Math.round((metrics.completed / metrics.total) * 100) : 0}%)
 - Em Andamento: ${metrics.inProgress}
@@ -98,32 +99,47 @@ DADOS DO DIA: ${dateStr}
 - Atrasadas: ${metrics.overdue}
 - Bloqueadas: ${metrics.blocked}
 
-🔴 TAREFAS ATRASADAS (últimos 15 dias):
-${recentOverdue.map(t => `- "${t.name}" | Responsável: ${t.assignee} | ${t.daysOverdue} dias atrasada | Projeto: ${t.folder} | Prioridade: ${t.priority}`).join("\n")}
+Tarefas Atrasadas (${recentOverdue.length} recentes):
+${recentOverdue.length > 0 ? recentOverdue.map(t => `- "${t.name}" | Resp: ${t.assignee} | ${t.daysOverdue}d atrasada | Proj: ${t.folder}`).join("\n") : "Nenhuma tarefa recentemente atrasada!"}
 
-📅 PRÓXIMOS VENCIMENTOS (5 dias):
-${upcomingList.map(t => `- "${t.name}" | Responsável: ${t.assignee} | Vence em ${t.daysUntilDue} dias | Projeto: ${t.folder}`).join("\n")}
+Próximos Vencimentos (5 dias):
+${upcomingList.length > 0 ? upcomingList.map(t => `- "${t.name}" | Resp: ${t.assignee} | Vence em ${t.daysUntilDue}d | Proj: ${t.folder}`).join("\n") : "Sem vencimentos nos próximos 5 dias."}
 
-👥 PERFORMANCE DA EQUIPE:
-${teamPerformance.map(m => `- ${m.name}: ${m.total} tarefas | ${m.completionRate}% concluído | ${m.overdue} atrasadas | ${m.inProgress} em andamento`).join("\n")}
+Performance da Equipe:
+${teamPerformance.map(m => `- ${m.name}: ${m.total} tarefas (${m.completionRate}% conc) | ${m.overdue} atrasadas | ${m.inProgress} em andamento`).join("\n")}
 
-🏢 RESUMO POR CLIENTE (top 10):
-${clientSummary.map(c => `- ${c.name}: ${c.total} tarefas | ${c.completionRate}% concluído | ${c.overdue} atrasadas`).join("\n")}
+Resumo por Cliente:
+${clientSummary.map(c => `- ${c.name}: ${c.total} tarefas (${c.completionRate}% conc) | ${c.overdue} atrasadas`).join("\n")}
+[FIM DOS DADOS DO CLICKUP]
 
 INSTRUÇÕES PARA O RELATÓRIO:
-Gere um relatório estruturado com as seguintes seções (use emojis para cada seção):
+Com base EXCLUSIVAMENTE nos dados fornecidos acima, gere um relatório estruturado com as seguintes seções (mantenha os emojis):
 
-1. 🚨 ALERTAS CRÍTICOS - Problemas urgentes que precisam de atenção IMEDIATA (tarefas muito atrasadas, gargalos, responsáveis sobrecarregados)
+1. 🚨 ALERTAS CRÍTICOS
+- Identifique problemas que precisam de atenção IMEDIATA.
+- Liste tarefas específicas que estão muito atrasadas, gargalos visíveis ou responsáveis que estão sobrecarregados (se houver).
+- Se os dados mostrarem 0% de atraso e nenhum gargalo, reconheça a excelência do cenário e pule para o próximo tópico sem inventar problemas.
 
-2. 📊 ANÁLISE DE PERFORMANCE - Como a equipe está performando? Quem está entregando bem? Quem precisa de suporte? Taxa de conclusão geral.
+2. 📊 ANÁLISE DE PERFORMANCE
+- Avalie o desempenho da equipe com base na taxa de conclusão e volume.
+- Destaque quem está entregando bem e quem (se houver alguém) apresenta gargalos ou precisa de suporte.
+- Mencione os nomes e números reais presentes nos dados.
 
-3. 📈 TENDÊNCIAS E PADRÕES - O que os dados revelam? Projetos com maior acúmulo de atraso, padrões de distribuição de tarefas.
+3. 📈 TENDÊNCIAS E PADRÕES
+- O que a distribuição de dados revela hoje?
+- Aponte projetos/clientes que demandam mais esforço ou padrões de acúmulo e distribuição de tarefas.
 
-4. 💡 RECOMENDAÇÕES DO DIA - 3 a 5 ações concretas e específicas que o gestor deveria tomar HOJE para melhorar os resultados.
+4. 💡 RECOMENDAÇÕES DO DIA
+- Forneça de 3 a 5 ações concretas, específicas e acionáveis que a gestão deve tomar HOJE para manter ou melhorar os resultados.
+- Baseie as ações estritamente nos dados de hoje (ex: "Fazer follow-up com o cliente X sobre a tarefa Y", ou "Parabenizar o colaborador Z pelo volume de entregas").
 
-5. 🎯 FOCO DO DIA - Qual deveria ser a prioridade #1 da equipe hoje?
+5. 🎯 FOCO DO DIA
+- Defina a prioridade número 1 da equipe para o dia de hoje, fundamentada no que apresenta maior risco ou maior impacto nos dados analisados.
 
-Seja direto, objetivo e use dados específicos nos insights. Não seja genérico. Mencione nomes, números e tarefas reais.`,
+REGRAS DE FORMATAÇÃO E TOM:
+- Seja direto, analítico e objetivo.
+- NÃO crie informações, nomes, tarefas ou clientes que não estejam no bloco de dados fornecido.
+- Se uma categoria (como tarefas atrasadas) estiver vazia, adapte a análise para celebrar o cumprimento de prazos em vez de apontar erros.`,
       metrics: {
         total: metrics.total,
         completed: metrics.completed,
