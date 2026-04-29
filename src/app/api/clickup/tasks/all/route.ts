@@ -2,7 +2,7 @@ import { getClickUpClient } from "@/lib/clickup/client";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // Increased timeout for large workspaces
+export const maxDuration = 60; // Max allowed for Vercel Hobby plan
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,9 +22,9 @@ export async function GET(request: NextRequest) {
       tags: searchParams.getAll("tags[]"),
     };
 
-    // Fetch all pages (up to 20000 tasks) concurrently and spaces to attach space names
+    // Fetch up to 10 pages (~1000 most recently updated tasks) to prevent Vercel 10s timeouts
     const [tasks, spaces] = await Promise.all([
-      client.getAllTasks(params, 200),
+      client.getAllTasks(params, 10),
       client.getSpaces()
     ]);
 
