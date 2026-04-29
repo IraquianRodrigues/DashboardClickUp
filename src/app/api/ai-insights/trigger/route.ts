@@ -12,10 +12,11 @@ export async function GET() {
       return NextResponse.json({ error: "GHL_WEBHOOK_URL not configured" }, { status: 500 });
     }
 
-    // Fetch all tasks from ClickUp
+    // Fetch up to 50 pages (~5000 tasks) to ensure all active data is included
+    // while keeping it under the 60s Serverless timeout limit
     const client = getClickUpClient();
     const [tasks, spaces] = await Promise.all([
-      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }, 10),
+      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }, 50),
       client.getSpaces(),
     ]);
 
