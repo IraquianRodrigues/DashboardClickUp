@@ -8,6 +8,7 @@ import { UpcomingDeadlines } from "@/components/dashboard/UpcomingDeadlines";
 import { OverdueMarquee } from "@/components/dashboard/OverdueMarquee";
 import { ProgressOverview } from "@/components/dashboard/ProgressOverview";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { AIInsights } from "@/components/dashboard/AIInsights";
 
 import { BlurFade } from "@/components/ui/blur-fade";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,7 +63,10 @@ export default function DashboardPage() {
           <BlurFade delay={0.45}><TasksByAssignee metrics={metrics} /></BlurFade>
         </div>
 
-
+        {/* AI Insights */}
+        <BlurFade delay={0.48}>
+          <AIInsights />
+        </BlurFade>
 
         {/* Bottom row: Deadlines + Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
