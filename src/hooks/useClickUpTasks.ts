@@ -43,7 +43,9 @@ async function fetchAllTasks(): Promise<ClickUpTask[]> {
     }
   }
   
-  return allTasks;
+  // De-duplicate tasks by ID (ClickUp pagination can sometimes return duplicates if tasks are updated during fetching)
+  const uniqueTasks = Array.from(new Map(allTasks.map(t => [t.id, t])).values());
+  return uniqueTasks;
 }
 
 export function useClickUpTasks() {
