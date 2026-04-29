@@ -55,7 +55,7 @@ export function useClickUpTasks() {
   });
 
   const metrics: DashboardMetrics | null = useMemo(() => {
-    if (!query.data) return null;
+    if (!query.data || !Array.isArray(query.data)) return null;
     return computeMetrics(query.data);
   }, [query.data]);
 

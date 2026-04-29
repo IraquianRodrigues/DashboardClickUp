@@ -21,10 +21,11 @@ import { computeMetrics } from "@/lib/clickup/helpers";
 export default function DashboardPage() {
   const { tasks, metrics: apiMetrics, isLoading, isFetching, lastUpdated, refetch, error } = useClickUpTasks();
 
-  const metrics = useMemo(() => apiMetrics || computeMetrics(tasks), [apiMetrics, tasks]);
+  const validTasks = Array.isArray(tasks) ? tasks : [];
+  const metrics = useMemo(() => apiMetrics || computeMetrics(validTasks), [apiMetrics, validTasks]);
 
-  const upcomingTasks = useMemo(() => getUpcomingTasks(tasks, 5), [tasks]);
-  const overdueTasks = useMemo(() => getOverdueTasks(tasks), [tasks]);
+  const upcomingTasks = useMemo(() => getUpcomingTasks(validTasks, 5), [validTasks]);
+  const overdueTasks = useMemo(() => getOverdueTasks(validTasks), [validTasks]);
 
   return (
     <div className="min-h-screen dashboard-grid-bg">
