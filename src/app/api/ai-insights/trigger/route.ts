@@ -12,11 +12,10 @@ export async function GET() {
       return NextResponse.json({ error: "GHL_WEBHOOK_URL not configured" }, { status: 500 });
     }
 
-    // Fetch up to 50 pages (~5000 tasks) to ensure all active data is included
-    // while keeping it under the 60s Serverless timeout limit
+    // Fetch ALL tasks with full pagination (up to 200 pages = 20,000 tasks)
     const client = getClickUpClient();
     const [tasks, spaces] = await Promise.all([
-      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }, 50),
+      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }),
       client.getSpaces(),
     ]);
 
@@ -80,8 +79,7 @@ export async function GET() {
         overdue: c.overdue,
         completionRate: c.total > 0 ? Math.round((c.completed / c.total) * 100) : 0,
       }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
+      .sort((a, b) => b.total - a.total);
 
     const payload = {
       callback_url: "https://empreendexpertdashboard.vercel.app/api/ai-insights/callback",
@@ -175,12 +173,14 @@ REGRAS DE FORMATAÇÃO E TOM:
       message: "Dados enviados ao GoHighLevel com sucesso. Aguardando processamento da IA.",
       sentAt: now.toISOString(),
       metricsSnapshot: {
+        tasksFetched: tasks.length,
         total: metrics.total,
         completed: metrics.completed,
         overdue: metrics.overdue,
         overdueRecent: recentOverdue.length,
         upcomingDeadlines: upcomingList.length,
         teamMembers: teamPerformance.length,
+        totalClients: clientSummary.length,
       },
     });
   } catch (error) {

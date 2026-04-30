@@ -146,21 +146,38 @@ export class ClickUpClient {
 
   async getAllTasks(params: Omit<TaskFilterParams, "page"> = {}, maxPages = 200): Promise<ClickUpTask[]> {
     const allTasks: ClickUpTask[] = [];
+    const seenIds = new Set<string>();
     let page = 0;
-    let lastPage = false;
-    
-    while (!lastPage && page < maxPages) {
-      const batchPromises = [];
-      for (let i = 0; i < 5 && page < maxPages; i++, page++) {
-        batchPromises.push(this.getFilteredTeamTasks({ ...params, page }));
+    const BATCH_SIZE = 3;
+
+    while (page < maxPages) {
+      // Create a batch of concurrent requests
+      const batchPages = [];
+      for (let i = 0; i < BATCH_SIZE && (page + i) < maxPages; i++) {
+        batchPages.push(page + i);
       }
-      
-      const results = await Promise.all(batchPromises);
+
+      const results = await Promise.all(
+        batchPages.map(p => this.getFilteredTeamTasks({ ...params, page: p }))
+      );
+
+      let shouldStop = false;
       for (const result of results) {
-        allTasks.push(...result.tasks);
-        if (result.lastPage) lastPage = true;
+        for (const task of result.tasks) {
+          if (!seenIds.has(task.id)) {
+            seenIds.add(task.id);
+            allTasks.push(task);
+          }
+        }
+        if (result.lastPage || result.tasks.length === 0) {
+          shouldStop = true;
+        }
       }
+
+      if (shouldStop) break;
+      page += BATCH_SIZE;
     }
+
     return allTasks;
   }
 
@@ -174,7 +191,7 @@ export class ClickUpClient {
 
   async getMembers(): Promise<ClickUpMember[]> {
     const data = await this.request<GetMembersResponse>(`/team/${this.teamId}`);
-    return data.members;
+    return data.team.members;
   }
 
   async getTaskComments(taskId: string): Promise<ClickUpComment[]> {

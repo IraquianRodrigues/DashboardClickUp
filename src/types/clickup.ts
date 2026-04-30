@@ -263,7 +263,11 @@ export interface GetListsResponse {
 }
 
 export interface GetMembersResponse {
-  members: ClickUpMember[];
+  team: {
+    id: string;
+    name: string;
+    members: ClickUpMember[];
+  };
 }
 
 export interface GetCommentsResponse {
