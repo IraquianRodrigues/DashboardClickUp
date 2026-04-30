@@ -7,10 +7,11 @@ export const maxDuration = 60;
 
 export async function GET() {
   try {
-    const webhookUrl = process.env.GHL_WEBHOOK_URL;
-    if (!webhookUrl) {
+    const webhookUrlRaw = process.env.GHL_WEBHOOK_URL;
+    if (!webhookUrlRaw) {
       return NextResponse.json({ error: "GHL_WEBHOOK_URL not configured" }, { status: 500 });
     }
+    const webhookUrl = webhookUrlRaw.trim();
 
     // Fetch ALL tasks with full pagination (up to 200 pages = 20,000 tasks)
     const client = getClickUpClient();

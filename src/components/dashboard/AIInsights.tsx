@@ -78,7 +78,7 @@ export function AIInsights() {
   const fetchInsights = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/ai-insights");
+      const res = await fetch(`/api/ai-insights?_t=${Date.now()}`, { cache: "no-store" });
       const json = await res.json();
       setData(json);
     } catch {
@@ -95,14 +95,56 @@ export function AIInsights() {
   const handleTrigger = async () => {
     try {
       setTriggering(true);
+      setData(prev => prev ? { ...prev, message: "Enviando dados para a IA..." } : { available: false, message: "Enviando dados para a IA..." });
+      
       const res = await fetch("/api/ai-insights/trigger");
+      
       if (res.ok) {
-        // Wait a moment then refresh
-        setTimeout(fetchInsights, 3000);
+        setData(prev => prev ? { ...prev, message: "Processando insights com a IA (pode levar alguns segundos)..." } : { available: false, message: "Processando insights com a IA (pode levar alguns segundos)..." });
+        
+        // Start polling for results
+        const pollInterval = setInterval(async () => {
+          try {
+            const checkRes = await fetch(`/api/ai-insights?_t=${Date.now()}`, { cache: "no-store" });
+            const checkJson = await checkRes.json();
+            
+            // If we got a new insight (it's available and generated recently)
+            if (checkJson.available) {
+              const generated = new Date(checkJson.generatedAt).getTime();
+              const now = new Date().getTime();
+              // If generated in the last 2 minutes, it's our new insight
+              if (now - generated < 120000) {
+                setData(checkJson);
+                setTriggering(false);
+                clearInterval(pollInterval);
+              }
+            }
+          } catch {
+            // ignore fetch errors during polling
+          }
+        }, 5000);
+
+        // Stop polling after 2 minutes to prevent infinite loops
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          setTriggering(false);
+        }, 120000);
+
+      } else {
+        const errJson = await res.json().catch(() => null);
+        console.error("Trigger errored:", errJson || res.statusText);
+        setData(prev => ({
+          available: false,
+          message: `Erro ao gerar insights: ${errJson?.error || res.statusText}`
+        }));
+        setTriggering(false);
       }
-    } catch {
-      // ignore
-    } finally {
+    } catch (err) {
+      console.error("Trigger fetch error:", err);
+      setData(prev => ({
+        available: false,
+        message: "Falha na comunicação com a API."
+      }));
       setTriggering(false);
     }
   };
@@ -186,11 +228,13 @@ export function AIInsights() {
               <Brain className="w-8 h-8 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground font-medium mb-1">
-              Nenhum insight disponível ainda
+              {data?.message || "Nenhum insight disponível ainda"}
             </p>
-            <p className="text-[10px] text-muted-foreground/60 max-w-sm">
-              Clique em &quot;Gerar Insights&quot; para enviar os dados ao GoHighLevel, ou aguarde o relatório automático diário às 09:00.
-            </p>
+            {!data?.message?.includes("Erro") && (
+              <p className="text-[10px] text-muted-foreground/60 max-w-sm">
+                Clique em &quot;Gerar Insights&quot; para enviar os dados ao Make, ou aguarde o relatório automático diário às 10:30.
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
