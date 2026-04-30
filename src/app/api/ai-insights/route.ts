@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     if (!latest) {
       return NextResponse.json({
         available: false,
-        message: "Nenhum insight disponível ainda. Clique em 'Gerar Insights' ou aguarde o relatório diário das 09:00.",
+        message: "Nenhum insight disponível ainda. Clique em 'Gerar Insights' ou aguarde o relatório diário das 17:30.",
       });
     }
 

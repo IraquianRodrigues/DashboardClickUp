@@ -148,7 +148,7 @@ export class ClickUpClient {
     const allTasks: ClickUpTask[] = [];
     const seenIds = new Set<string>();
     let page = 0;
-    const BATCH_SIZE = 3;
+    const BATCH_SIZE = 10;
 
     while (page < maxPages) {
       // Create a batch of concurrent requests

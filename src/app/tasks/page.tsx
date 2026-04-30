@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Header } from "@/components/layout/Header";
 import { TaskFilters } from "@/components/tasks/TaskFilters";
 import { TaskTable } from "@/components/tasks/TaskTable";
@@ -27,6 +27,24 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [copied, setCopied] = useState(false);
 
+  const appliedMemberFilter = useRef(false);
+
+  useEffect(() => {
+    if (appliedMemberFilter.current) return;
+    try {
+      const memberId = sessionStorage.getItem("team-filter-member");
+      if (memberId && filterOptions.assignees.length > 0) {
+        const id = parseInt(memberId);
+        const exists = filterOptions.assignees.some(a => a.id === id);
+        if (exists) {
+          setFilter("assignees", [id]);
+          appliedMemberFilter.current = true;
+          sessionStorage.removeItem("team-filter-member");
+        }
+      }
+    } catch {}
+  }, [filterOptions.assignees, setFilter]);
+
   const handleTaskClick = (taskId: string) => {
     setSelectedTaskId(taskId);
     setDetailOpen(true);
@@ -47,19 +65,16 @@ export default function TasksPage() {
       <Header title="Tarefas" subtitle={`${filteredTasks.length} tarefa${filteredTasks.length !== 1 ? "s" : ""}`} lastUpdated={lastUpdated} isFetching={isFetching} onRefresh={refetch} />
 
       <div className="p-6 space-y-4">
-        {/* Quick Stats */}
         <BlurFade delay={0.05}>
           <TaskQuickStats tasks={tasks} filteredCount={filteredTasks.length} />
         </BlurFade>
 
-        {/* Filters + View Toggle + Copy */}
         <BlurFade delay={0.1}>
           <div className="flex items-start gap-3">
             <div className="flex-1">
               <TaskFilters filters={filters} options={filterOptions} activeCount={activeFilterCount} onFilterChange={setFilter} onClear={clearFilters} />
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Copy */}
               <Button
                 variant="outline"
                 size="sm"
@@ -70,7 +85,6 @@ export default function TasksPage() {
                 <span className="text-xs hidden sm:inline">{copied ? "Copiado!" : "Copiar"}</span>
               </Button>
 
-              {/* View toggle */}
               <div className="flex rounded-xl border border-border/50 overflow-hidden">
                 <button
                   onClick={() => setViewMode("table")}
@@ -95,7 +109,6 @@ export default function TasksPage() {
           </div>
         </BlurFade>
 
-        {/* Task View */}
         {isLoading && tasks.length === 0 ? (
           <div className="space-y-3">
             {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}

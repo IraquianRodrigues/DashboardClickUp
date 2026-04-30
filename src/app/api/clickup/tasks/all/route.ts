@@ -1,5 +1,10 @@
 import { getClickUpClient } from "@/lib/clickup/client";
+import type { ClickUpTask } from "@/types/clickup";
 import { NextRequest, NextResponse } from "next/server";
+
+interface EnrichedTask extends ClickUpTask {
+  space: ClickUpTask["space"] & { name?: string };
+}
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Max allowed for Vercel Hobby plan
@@ -23,6 +28,7 @@ export async function GET(request: NextRequest) {
       space_ids: searchParams.getAll("space_ids[]"),
       list_ids: searchParams.getAll("list_ids[]"),
       tags: searchParams.getAll("tags[]"),
+      date_updated_gt: searchParams.get("date_updated_gt") ? parseInt(searchParams.get("date_updated_gt")!) : undefined,
     };
 
     // Fetch ONLY the requested page and the spaces
@@ -32,14 +38,15 @@ export async function GET(request: NextRequest) {
     ]);
 
     const spaceMap = new Map(spaces.map(s => [s.id, s.name]));
-    for (const task of result.tasks) {
+    const enrichedTasks: EnrichedTask[] = result.tasks.map(task => {
       if (task.space && spaceMap.has(task.space.id)) {
-        (task.space as any).name = spaceMap.get(task.space.id);
+        return { ...task, space: { ...task.space, name: spaceMap.get(task.space.id) } };
       }
-    }
+      return task as EnrichedTask;
+    });
 
     return NextResponse.json({
-      tasks: result.tasks,
+      tasks: enrichedTasks,
       lastPage: result.lastPage
     }, {
       headers: { "Cache-Control": "s-maxage=10, stale-while-revalidate=30" }, // Reduce cache time for pagination

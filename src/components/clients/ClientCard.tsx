@@ -1,13 +1,12 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import React from "react";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { cn } from "@/lib/utils";
-import type { ClickUpUser } from "@/types/clickup";
-import { getUserInitials } from "@/lib/clickup/helpers";
+import { useRouter } from "next/navigation";
 
 interface ClientCardProps {
   name: string;
@@ -15,17 +14,28 @@ interface ClientCardProps {
   completed: number;
   overdue: number;
   responsible?: string;
+  pending?: number;
 }
 
-export function ClientCard({ name, total, completed, overdue, responsible }: ClientCardProps) {
+export const ClientCard = React.memo(function ClientCard({ name, total, completed, overdue, responsible, pending }: ClientCardProps) {
+  const router = useRouter();
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
   const hasCritical = overdue > 0;
+  const pendingCount = pending ?? (total - completed);
+
+  const slug = encodeURIComponent(name);
 
   return (
-    <div className={cn(
-      "relative overflow-hidden rounded-2xl border bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg",
-      hasCritical ? "border-[var(--color-brand-orange)]/30 hover:shadow-[0_0_20px_rgba(255,102,0,0.2)]" : "border-white/5 hover:border-white/10"
-    )}>
+    <div
+      role="article"
+      aria-label={`Cliente ${name}`}
+      tabIndex={0}
+      onClick={() => router.push(`/clients/${slug}`)}
+      onKeyDown={(e) => { if (e.key === "Enter") router.push(`/clients/${slug}`); }}
+      className={cn(
+        "relative overflow-hidden rounded-2xl border bg-gradient-to-b from-white/5 to-transparent backdrop-blur-xl p-5 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg cursor-pointer",
+        hasCritical ? "border-[var(--color-brand-orange)]/30 hover:shadow-[0_0_20px_rgba(255,102,0,0.2)]" : "border-white/5 hover:border-white/10"
+      )}>
       {hasCritical && <BorderBeam size={100} duration={10} colorFrom="var(--color-brand-orange)" colorTo="var(--color-brand-orange)" />}
 
       <div className="flex items-start justify-between mb-4">
@@ -52,9 +62,9 @@ export function ClientCard({ name, total, completed, overdue, responsible }: Cli
 
       <div className="flex items-center gap-3 text-xs">
         <Badge variant="outline" className="bg-[var(--color-brand-green)]/10 text-[var(--color-brand-green)] border-[var(--color-brand-green)]/20 rounded-lg">{completed} concluídas</Badge>
-        <Badge variant="outline" className="bg-[var(--color-brand-blue)]/10 text-[var(--color-brand-blue)] border-[var(--color-brand-blue)]/20 rounded-lg">{total - completed} pendentes</Badge>
+        <Badge variant="outline" className="bg-[var(--color-brand-blue)]/10 text-[var(--color-brand-blue)] border-[var(--color-brand-blue)]/20 rounded-lg">{pendingCount} pendentes</Badge>
         {overdue > 0 && <Badge variant="outline" className="bg-[var(--color-brand-orange)]/10 text-[var(--color-brand-orange)] border-[var(--color-brand-orange)]/20 rounded-lg">{overdue} atrasadas</Badge>}
       </div>
     </div>
   );
-}
+});

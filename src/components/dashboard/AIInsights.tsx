@@ -132,10 +132,11 @@ export function AIInsights() {
 
       } else {
         const errJson = await res.json().catch(() => null);
-        console.error("Trigger errored:", errJson || res.statusText);
+        console.error("Trigger errored:", errJson || res.status || res.statusText);
+        const errorMessage = errJson?.error || res.statusText || (res.status === 504 ? "Timeout do servidor (504)" : "Erro desconhecido");
         setData(prev => ({
           available: false,
-          message: `Erro ao gerar insights: ${errJson?.error || res.statusText}`
+          message: `Erro ao gerar insights: ${errorMessage}`
         }));
         setTriggering(false);
       }
@@ -232,7 +233,7 @@ export function AIInsights() {
             </p>
             {!data?.message?.includes("Erro") && (
               <p className="text-[10px] text-muted-foreground/60 max-w-sm">
-                Clique em &quot;Gerar Insights&quot; para enviar os dados ao Make, ou aguarde o relatório automático diário às 10:30.
+                Clique em &quot;Gerar Insights&quot; para enviar os dados ao Make, ou aguarde o relatório automático diário às 17:30.
               </p>
             )}
           </div>

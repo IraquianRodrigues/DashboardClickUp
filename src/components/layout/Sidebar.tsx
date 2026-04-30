@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ListTodo, Users, Building2, Menu, X, Zap } from "lucide-react";
+import { LayoutDashboard, ListTodo, Users, Building2, Menu, X, Zap, Brain, Target } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -11,6 +11,8 @@ const navItems = [
   { href: "/tasks", label: "Tarefas", icon: ListTodo },
   { href: "/clients", label: "Clientes", icon: Building2 },
   { href: "/team", label: "Equipe", icon: Users },
+  { href: "/ai-insights", label: "Insights IA", icon: Brain },
+  { href: "/comercial", label: "Comercial", icon: Target },
 ];
 
 export function Sidebar() {

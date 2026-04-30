@@ -14,6 +14,9 @@ async function fetchAllTasks(): Promise<ClickUpTask[]> {
   
   // Maximum safeguard to prevent infinite loops (e.g. 500 pages = 50,000 tasks)
   const MAX_PAGES = 500;
+  
+  // Only fetch tasks from the last 30 days
+  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
 
   while (!lastPage && page < MAX_PAGES) {
     // Fetch up to 5 pages in parallel to speed things up
@@ -23,9 +26,10 @@ async function fetchAllTasks(): Promise<ClickUpTask[]> {
       sp.set("include_closed", "true");
       sp.set("subtasks", "true");
       sp.set("page", String(page));
+      sp.set("date_updated_gt", String(thirtyDaysAgo));
       
       batchPromises.push(
-        fetch(`/api/clickup/tasks/all?${sp.toString()}&_t=${Date.now()}`).then(res => {
+        fetch(`/api/clickup/tasks/all?${sp.toString()}`).then(res => {
           if (!res.ok) throw new Error(`Failed to fetch tasks page ${page}`);
           return res.json();
         })

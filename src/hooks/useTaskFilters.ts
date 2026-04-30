@@ -1,25 +1,82 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import type { ClickUpTask, TaskFiltersState } from "@/types/clickup";
 import { DEFAULT_FILTERS } from "@/types/clickup";
 import { extractClientName, getPriorityLevel, isDone, isInProgress } from "@/lib/clickup/helpers";
 
-// Normalize raw ClickUp statuses into 3 categories
+const STORAGE_KEY = "task-filters-prefs";
+
+function loadSavedFilters(): Partial<TaskFiltersState> {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return {};
+}
+
 function getNormalizedStatus(task: ClickUpTask): string {
   if (isDone(task)) return "concluído";
   if (isInProgress(task)) return "em progresso";
   return "pendente";
 }
 
-export function useTaskFilters(tasks: ClickUpTask[]) {
-  const [filters, setFilters] = useState<TaskFiltersState>(DEFAULT_FILTERS);
+export type DueDateFilter = "all" | "overdue" | "today" | "tomorrow" | "week" | "month" | "nodate";
 
-  const setFilter = useCallback(<K extends keyof TaskFiltersState>(key: K, value: TaskFiltersState[K]) => {
+export interface ExtendedTaskFiltersState extends TaskFiltersState {
+  dueDate: DueDateFilter;
+}
+
+const EXTENDED_DEFAULTS: ExtendedTaskFiltersState = {
+  ...DEFAULT_FILTERS,
+  dueDate: "all",
+};
+
+function getDateBoundaries() {
+  const now = Date.now();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayStartMs = todayStart.getTime();
+
+  const tomorrowEnd = new Date(todayStart);
+  tomorrowEnd.setDate(tomorrowEnd.getDate() + 2);
+  const tomorrowEndMs = tomorrowEnd.getTime();
+
+  const weekEnd = new Date(todayStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndMs = weekEnd.getTime();
+
+  const monthEnd = new Date(todayStart);
+  monthEnd.setMonth(monthEnd.getMonth() + 1);
+  const monthEndMs = monthEnd.getTime();
+
+  return { now, todayStartMs, tomorrowEndMs, weekEndMs, monthEndMs };
+}
+
+export function useTaskFilters(tasks: ClickUpTask[]) {
+  const [filters, setFilters] = useState<ExtendedTaskFiltersState>(() => {
+    const saved = loadSavedFilters();
+    return { ...EXTENDED_DEFAULTS, ...saved } as ExtendedTaskFiltersState;
+  });
+
+  useEffect(() => {
+    const toSave: Record<string, unknown> = {};
+    if (filters.search) toSave.search = filters.search;
+    if (filters.statuses.length) toSave.statuses = filters.statuses;
+    if (filters.priorities.length) toSave.priorities = filters.priorities;
+    if (filters.assignees.length) toSave.assignees = filters.assignees;
+    if (filters.clients.length) toSave.clients = filters.clients;
+    if (filters.dueDate !== "all") toSave.dueDate = filters.dueDate;
+    if (Object.keys(toSave).length > 0) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)); } catch {}
+    }
+  }, [filters]);
+
+  const setFilter = useCallback(<K extends keyof ExtendedTaskFiltersState>(key: K, value: ExtendedTaskFiltersState[K]) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const clearFilters = useCallback(() => setFilters(DEFAULT_FILTERS), []);
+  const clearFilters = useCallback(() => setFilters(EXTENDED_DEFAULTS), []);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -28,15 +85,22 @@ export function useTaskFilters(tasks: ClickUpTask[]) {
     if (filters.priorities.length) count++;
     if (filters.assignees.length) count++;
     if (filters.clients.length) count++;
-    if (filters.listIds.length) count++;
+    if (filters.dueDate !== "all") count++;
     return count;
-  }, [filters]);
+  }, [filters.search, filters.statuses.length, filters.priorities.length, filters.assignees.length, filters.clients.length, filters.dueDate]);
 
   const filteredTasks = useMemo(() => {
+    const { now, todayStartMs, tomorrowEndMs, weekEndMs, monthEndMs } = getDateBoundaries();
     return tasks.filter((task) => {
       if (filters.search) {
         const q = filters.search.toLowerCase();
-        if (!task.name.toLowerCase().includes(q)) return false;
+        const client = extractClientName(task).toLowerCase();
+        const description = (task.description || "").toLowerCase();
+        if (
+          !task.name.toLowerCase().includes(q) &&
+          !client.includes(q) &&
+          !description.includes(q)
+        ) return false;
       }
       if (filters.statuses.length) {
         const normalized = getNormalizedStatus(task);
@@ -48,12 +112,23 @@ export function useTaskFilters(tasks: ClickUpTask[]) {
         const client = extractClientName(task);
         if (!filters.clients.includes(client)) return false;
       }
-      if (filters.listIds.length && !filters.listIds.includes(task.list.id)) return false;
+      if (filters.dueDate !== "all" && task.due_date) {
+        const due = parseInt(task.due_date);
+        switch (filters.dueDate) {
+          case "overdue": if (due >= now || isDone(task)) return false; break;
+          case "today": if (due < todayStartMs || due >= tomorrowEndMs) return false; break;
+          case "tomorrow": if (due < tomorrowEndMs || due >= weekEndMs) return false; break;
+          case "week": if (due < todayStartMs || due >= weekEndMs) return false; break;
+          case "month": if (due < todayStartMs || due >= monthEndMs) return false; break;
+          case "nodate": return false;
+        }
+      } else if (filters.dueDate === "nodate" && task.due_date) {
+        return false;
+      }
       return true;
     });
   }, [tasks, filters]);
 
-  // Extract unique values for filter options
   const filterOptions = useMemo(() => {
     const priorities = new Set<string>();
     const assignees = new Map<number, { id: number; username: string; profilePicture: string | null }>();
@@ -74,7 +149,7 @@ export function useTaskFilters(tasks: ClickUpTask[]) {
         { name: "pendente", color: "#9ca3af" },
       ],
       priorities: ["urgent", "high", "normal", "low"],
-      assignees: Array.from(assignees.values()),
+      assignees: Array.from(assignees.values()).sort((a, b) => (a.username || "").localeCompare(b.username || "")),
       clients: Array.from(clients).sort(),
       lists: Array.from(lists.entries()).map(([id, name]) => ({ id, name })),
     };

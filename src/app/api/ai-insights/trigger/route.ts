@@ -13,10 +13,17 @@ export async function GET() {
     }
     const webhookUrl = webhookUrlRaw.trim();
 
-    // Fetch ALL tasks with full pagination (up to 200 pages = 20,000 tasks)
+    // Fetch tasks updated in the last 30 days to avoid rate limits (95 req/min)
+    // and Vercel 504 timeouts (60s max limit) while still getting relevant active data
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     const client = getClickUpClient();
     const [tasks, spaces] = await Promise.all([
-      client.getAllTasks({ include_closed: true, order_by: "updated", reverse: true }),
+      client.getAllTasks({ 
+        include_closed: true, 
+        order_by: "updated", 
+        reverse: true,
+        date_updated_gt: thirtyDaysAgo
+      }),
       client.getSpaces(),
     ]);
 
@@ -87,17 +94,18 @@ export async function GET() {
       date: dateStr,
       timestamp: now.toISOString(),
       prompt: `Você é um analista sênior de projetos e gerenciamento de equipe. Analise os dados brutos abaixo extraídos em tempo real do nosso sistema de gestão de tarefas (ClickUp) e forneça um relatório de insights em português brasileiro.
-
-DADOS EXTRAÍDOS EM: ${now.toISOString()}
-
-[INÍCIO DOS DADOS DO CLICKUP]
-Métricas Gerais:
-- Total de tarefas: ${metrics.total}
-- Concluídas: ${metrics.completed} (${metrics.total > 0 ? Math.round((metrics.completed / metrics.total) * 100) : 0}%)
-- Em Andamento: ${metrics.inProgress}
-- Pendentes: ${metrics.pending}
-- Atrasadas: ${metrics.overdue}
-- Bloqueadas: ${metrics.blocked}
+ 
+ DADOS EXTRAÍDOS EM: ${now.toISOString()}
+ (Nota: Estes dados representam as tarefas ativas e atualizadas nos últimos 30 dias para análise de performance recente)
+ 
+ [INÍCIO DOS DADOS DO CLICKUP]
+ Métricas Gerais (Últimos 30 dias):
+ - Total de tarefas movimentadas: ${metrics.total}
+ - Concluídas neste período: ${metrics.completed} (${metrics.total > 0 ? Math.round((metrics.completed / metrics.total) * 100) : 0}%)
+ - Em Andamento: ${metrics.inProgress}
+ - Pendentes: ${metrics.pending}
+ - Atrasadas: ${metrics.overdue}
+ - Bloqueadas: ${metrics.blocked}
 
 Tarefas Atrasadas (${recentOverdue.length} recentes):
 ${recentOverdue.length > 0 ? recentOverdue.map(t => `- "${t.name}" | Resp: ${t.assignee} | ${t.daysOverdue}d atrasada | Proj: ${t.folder}`).join("\n") : "Nenhuma tarefa recentemente atrasada!"}
