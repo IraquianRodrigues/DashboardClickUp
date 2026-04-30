@@ -27,18 +27,28 @@ export async function GET() {
       client.getSpaces(),
     ]);
 
-    // Attach space names
+    // Attach space names and filter inactive spaces
     const spaceMap = new Map(spaces.map(s => [s.id, s.name]));
+    let activeTasks = [];
     for (const task of tasks) {
       if (task.space && spaceMap.has(task.space.id)) {
         (task.space as any).name = spaceMap.get(task.space.id);
       }
+      const spaceName = (task.space as any)?.name || "";
+      const folderName = task.folder?.name || "";
+      const listName = task.list?.name || "";
+      const inactiveName = "TP - CLIENTES INATIVOS";
+      
+      if (spaceName !== inactiveName && folderName !== inactiveName && listName !== inactiveName) {
+        activeTasks.push(task);
+      }
     }
+    const filteredTasks = activeTasks;
 
-    // Compute metrics
-    const metrics = computeMetrics(tasks);
-    const overdue = getOverdueTasks(tasks);
-    const upcoming = getUpcomingTasks(tasks, 5);
+    // Compute metrics using the filtered list of tasks
+    const metrics = computeMetrics(filteredTasks);
+    const overdue = getOverdueTasks(filteredTasks);
+    const upcoming = getUpcomingTasks(filteredTasks, 5);
 
     // Build analysis-focused summary for the AI
     const now = new Date();
@@ -182,7 +192,7 @@ REGRAS DE FORMATAÇÃO E TOM:
       message: "Dados enviados ao GoHighLevel com sucesso. Aguardando processamento da IA.",
       sentAt: now.toISOString(),
       metricsSnapshot: {
-        tasksFetched: tasks.length,
+        tasksFetched: filteredTasks.length,
         total: metrics.total,
         completed: metrics.completed,
         overdue: metrics.overdue,

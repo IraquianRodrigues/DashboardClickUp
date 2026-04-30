@@ -10,13 +10,19 @@ interface TasksByAssigneeProps {
 function CustomLabel(props: any) {
   const { x, y, width, height, value } = props;
   if (!value || value === 0) return null;
+  
+  // Renderiza dentro da barra se houver espaço, caso contrário fora
+  const isInside = width > 25;
+  const labelX = isInside ? x + width - 8 : x + width + 8;
+  const anchor = isInside ? "end" : "start";
+
   return (
     <text
-      x={x + width + 6}
+      x={labelX}
       y={y + height / 2}
-      textAnchor="start"
+      textAnchor={anchor}
       dominantBaseline="central"
-      className="text-[10px] font-bold fill-white/40"
+      className="text-xs font-black fill-white drop-shadow-md"
     >
       {value}
     </text>

@@ -38,12 +38,21 @@ export async function GET(request: NextRequest) {
     ]);
 
     const spaceMap = new Map(spaces.map(s => [s.id, s.name]));
-    const enrichedTasks: EnrichedTask[] = result.tasks.map(task => {
-      if (task.space && spaceMap.has(task.space.id)) {
-        return { ...task, space: { ...task.space, name: spaceMap.get(task.space.id) } };
-      }
-      return task as EnrichedTask;
-    });
+    const enrichedTasks: EnrichedTask[] = result.tasks
+      .map(task => {
+        if (task.space && spaceMap.has(task.space.id)) {
+          return { ...task, space: { ...task.space, name: spaceMap.get(task.space.id) } };
+        }
+        return task as EnrichedTask;
+      })
+      .filter(task => {
+        const spaceName = task.space?.name || "";
+        const folderName = task.folder?.name || "";
+        const listName = task.list?.name || "";
+        const inactiveName = "TP - CLIENTES INATIVOS";
+        
+        return spaceName !== inactiveName && folderName !== inactiveName && listName !== inactiveName;
+      });
 
     return NextResponse.json({
       tasks: enrichedTasks,
