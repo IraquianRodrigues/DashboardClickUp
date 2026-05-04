@@ -9,6 +9,10 @@ export function KeepAlive() {
   useEffect(() => {
     // 1. Tentar usar a API Wake Lock (funciona em navegadores modernos)
     const requestWakeLock = async () => {
+      if (document.visibilityState !== "visible") {
+        return; // O navegador não permite pedir Wake Lock se a aba não estiver visível
+      }
+
       try {
         if ("wakeLock" in navigator) {
           wakeLockRef.current = await navigator.wakeLock.request("screen");
@@ -21,7 +25,9 @@ export function KeepAlive() {
           });
         }
       } catch (err: any) {
-        console.error(`Erro ao pedir Wake Lock: ${err.name}, ${err.message}`);
+        if (err.name !== "NotAllowedError") {
+          console.error(`Erro ao pedir Wake Lock: ${err.name}, ${err.message}`);
+        }
       }
     };
 
@@ -36,27 +42,44 @@ export function KeepAlive() {
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // 2. Fallback para Smart TVs: Recarregar a página automaticamente a cada 28 minutos
-    // TVs (Samsung/LG) frequentemente ignoram o Wake Lock.
-    // Recarregar pouco antes do limite de 30 minutos garante que a TV reinicie seu contador de inatividade
-    // e também limpa a memória da TV (evitando travamentos em monitores 24/7).
+    // 2. Simular atividade de usuário a cada 1 minuto (MUITO EFICIENTE PARA TVs)
+    // Sistemas de Smart TV usam eventos reais da janela para contar inatividade.
+    const activityInterval = setInterval(() => {
+      try {
+        // Disparar evento de movimento do mouse falso
+        const mouseEvent = new MouseEvent("mousemove", { bubbles: true, cancelable: true, view: window });
+        document.dispatchEvent(mouseEvent);
+        
+        // Disparar evento de toque falso para TVs touchscreen/smart
+        const touchEvent = new Event("touchstart", { bubbles: true, cancelable: true });
+        document.dispatchEvent(touchEvent);
+
+        // Fazer um micro-scroll imperceptível para resetar o idle timer do navegador da TV
+        window.scrollBy(0, 1);
+        setTimeout(() => window.scrollBy(0, -1), 50);
+        
+        console.log("[KeepAlive] Atividade simulada para manter a TV ligada.");
+      } catch (e) {}
+    }, 60 * 1000); // 1 minuto
+
+    // 3. Fallback para Smart TVs: Recarregar a página antes dos 30 minutos (25 min)
     const refreshInterval = setInterval(() => {
       console.log("Recarregando a página para manter a TV acordada e liberar memória...");
       window.location.reload();
-    }, 28 * 60 * 1000); // 28 minutos
+    }, 25 * 60 * 1000); // 25 minutos para garantir que ocorra antes do corte de 30 min da TV
 
     return () => {
       if (wakeLockRef.current) {
         wakeLockRef.current.release();
       }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(activityInterval);
       clearInterval(refreshInterval);
     };
   }, [wakeLockEnabled]);
 
-  // 3. Fallback adicional (Video Loop Hack)
-  // Tocar um vídeo vazio repetidamente é um hack conhecido para evitar que sistemas de TV
-  // entrem no modo de suspensão de tela.
+  // 4. Fallback de Mídia (Video Loop Hack)
+  // Smart TVs costumam ignorar vídeos 1x1. Usamos 100vw/100vh com opacidade quase zero.
   return (
     <video
       loop
@@ -64,10 +87,12 @@ export function KeepAlive() {
       autoPlay
       playsInline
       style={{
-        position: "absolute",
-        width: "1px",
-        height: "1px",
-        opacity: 0.01,
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        opacity: 0.001, // Quase invisível, mas renderiza
         pointerEvents: "none",
         zIndex: -9999,
       }}

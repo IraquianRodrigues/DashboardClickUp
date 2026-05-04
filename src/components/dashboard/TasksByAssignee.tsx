@@ -15,6 +15,7 @@ function CustomLabel(props: any) {
   const isInside = width > 25;
   const labelX = isInside ? x + width - 8 : x + width + 8;
   const anchor = isInside ? "end" : "start";
+  const fillColor = isInside ? "fill-black" : "fill-white";
 
   return (
     <text
@@ -22,7 +23,7 @@ function CustomLabel(props: any) {
       y={y + height / 2}
       textAnchor={anchor}
       dominantBaseline="central"
-      className="text-xs font-black fill-white drop-shadow-md"
+      className={`text-sm font-black drop-shadow-sm ${fillColor}`}
     >
       {value}
     </text>

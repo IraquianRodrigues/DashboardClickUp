@@ -37,7 +37,7 @@ export function Sidebar() {
       )}>
         {/* Logo */}
         <div className={cn("flex items-center px-6 py-6 border-b border-border/50 h-24", collapsed ? "justify-center px-0" : "justify-between")}>
-          {!collapsed && <img src="/logo.png" alt="Company Logo" className="w-auto h-12 object-contain" />}
+          {!collapsed && <img src="/Empreende Xpert - Logo.ai.png" alt="Empreende Xpert Logo" className="w-auto h-12 object-contain" />}
           <button 
             onClick={() => setCollapsed(!collapsed)} 
             className="hidden lg:flex p-1.5 rounded-lg text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
