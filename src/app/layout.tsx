@@ -4,6 +4,7 @@ import { Providers } from "@/providers/query-provider";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { KeepAlive } from "@/components/KeepAlive";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar />
             <main className="flex-1 min-h-screen overflow-x-hidden">{children}</main>
             <Toaster richColors position="bottom-right" />
+            <KeepAlive />
           </TooltipProvider>
         </Providers>
       </body>
