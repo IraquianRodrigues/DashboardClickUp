@@ -25,8 +25,8 @@ export default function ClientsPage() {
   const metrics = useMemo(() => computeMetrics(activeTasks), [activeTasks]);
 
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<ClientSortKey>("total");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortKey, setSortKey] = useState<ClientSortKey>("completion");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   const clientList = useMemo(() => {
     let list = Object.values(metrics.byClient);
