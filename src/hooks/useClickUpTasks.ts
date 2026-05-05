@@ -5,7 +5,7 @@ import type { ClickUpTask, DashboardMetrics } from "@/types/clickup";
 import { computeMetrics } from "@/lib/clickup/helpers";
 import { useMemo } from "react";
 
-const POLLING_INTERVAL = parseInt(process.env.NEXT_PUBLIC_POLLING_INTERVAL || "30000");
+const POLLING_INTERVAL = parseInt(process.env.NEXT_PUBLIC_POLLING_INTERVAL || "60000");
 
 async function fetchAllTasks(): Promise<ClickUpTask[]> {
   let page = 0;
