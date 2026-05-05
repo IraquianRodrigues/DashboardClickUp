@@ -214,3 +214,9 @@
   transform: perspective(800px) rotateY(-1deg) rotateX(1deg) scale(1.01);
   box-shadow: 0 20px 40px rgba(0,0,0,0.3);
 }
+
+/* Shimmer animation for refresh indicator */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
