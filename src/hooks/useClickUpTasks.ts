@@ -5,7 +5,7 @@ import type { ClickUpTask, DashboardMetrics } from "@/types/clickup";
 import { computeMetrics } from "@/lib/clickup/helpers";
 import { useMemo } from "react";
 
-const POLLING_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const POLLING_INTERVAL = 10 * 60 * 1000; // 10 minutes
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_RETRIES = 2;
 const INACTIVE_NAME = "TP - CLIENTES INATIVOS";
