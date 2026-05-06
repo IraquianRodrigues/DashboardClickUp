@@ -12,16 +12,16 @@ async function fetchAllTasks(): Promise<ClickUpTask[]> {
   let lastPage = false;
   const allTasks: ClickUpTask[] = [];
   
-  // Maximum safeguard to prevent infinite loops (e.g. 500 pages = 50,000 tasks)
   const MAX_PAGES = 500;
+  const FETCH_TIMEOUT_MS = 9_000; // Slightly under Netlify's 10s limit
   
   // Only fetch tasks from the last 30 days
   const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
 
   while (!lastPage && page < MAX_PAGES) {
-    // Fetch up to 5 pages in parallel to speed things up
+    // Fetch 2 pages in parallel (reduced from 5 to avoid overwhelming serverless functions)
     const batchPromises = [];
-    for (let i = 0; i < 5 && page < MAX_PAGES; i++, page++) {
+    for (let i = 0; i < 2 && page < MAX_PAGES; i++, page++) {
       const sp = new URLSearchParams();
       sp.set("include_closed", "true");
       sp.set("subtasks", "true");
@@ -29,10 +29,12 @@ async function fetchAllTasks(): Promise<ClickUpTask[]> {
       sp.set("date_updated_gt", String(thirtyDaysAgo));
       
       batchPromises.push(
-        fetch(`/api/clickup/tasks/all?${sp.toString()}`).then(res => {
-          if (!res.ok) throw new Error(`Failed to fetch tasks page ${page}`);
-          return res.json();
-        })
+        fetchWithTimeout(`/api/clickup/tasks/all?${sp.toString()}`, FETCH_TIMEOUT_MS)
+          .then(res => {
+            if (!res.ok) throw new Error(`Failed to fetch tasks page ${page}`);
+            return res.json();
+          })
+          .catch(() => ({ tasks: [], lastPage: true })) // Graceful degradation: stop on error
       );
     }
     
@@ -47,9 +49,15 @@ async function fetchAllTasks(): Promise<ClickUpTask[]> {
     }
   }
   
-  // De-duplicate tasks by ID (ClickUp pagination can sometimes return duplicates if tasks are updated during fetching)
+  // De-duplicate tasks by ID
   const uniqueTasks = Array.from(new Map(allTasks.map(t => [t.id, t])).values());
   return uniqueTasks;
+}
+
+function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
 }
 
 export function useClickUpTasks() {

@@ -2,6 +2,11 @@ const GHL_BASE_URL = "https://services.leadconnectorhq.com";
 const GHL_API_VERSION = "2021-07-28";
 const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || "";
 
+// Netlify serverless functions have a 10s (free) / 26s (pro) timeout.
+// Limit pagination to avoid exceeding that.
+const MAX_PAGES_PER_REQUEST = 5;
+const FETCH_TIMEOUT_MS = 8_000;
+
 export class GHLClientError extends Error {
   constructor(message: string, public statusCode: number, public endpoint: string) {
     super(message);
@@ -23,16 +28,18 @@ async function request<T>(endpoint: string, options: RequestInit = {}, retries =
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(url, { cache: "no-store", ...options, headers });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const response = await fetch(url, { cache: "no-store", ...options, headers, signal: controller.signal }).finally(() => clearTimeout(timeout));
 
       if (response.status === 429) {
-        const retryAfter = parseInt(response.headers.get("retry-after") || "5") * 1000;
-        await new Promise(resolve => setTimeout(resolve, retryAfter));
+        const retryAfter = parseInt(response.headers.get("retry-after") || "2") * 1000;
+        await new Promise(resolve => setTimeout(resolve, Math.min(retryAfter, 3000)));
         continue;
       }
 
       if ([502, 503, 504].includes(response.status) && attempt < retries) {
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 2000));
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
         continue;
       }
 
@@ -72,21 +79,24 @@ export interface GHLContact {
   customFields: Array<{ id: string; value: string }>;
 }
 
-export async function getContacts(locationId?: string, limit = 100): Promise<{ contacts: GHLContact[]; total: number }> {
+export async function getContacts(locationId?: string, limit = 100, maxPages = MAX_PAGES_PER_REQUEST): Promise<{ contacts: GHLContact[]; total: number }> {
   const allContacts: GHLContact[] = [];
   let page = 1;
   const perPage = Math.min(limit, 100);
   
-  while (true) {
+  while (page <= maxPages) {
     const sp = new URLSearchParams();
     sp.set("locationId", locationId || GHL_LOCATION_ID);
     sp.set("limit", String(perPage));
     sp.set("page", String(page));
     
-    const data = await request<{ contacts: GHLContact[]; meta: { total: number; currentPage: number; nextPage: number; prevPage: number } }>(`/contacts/?${sp.toString()}`);
-    allContacts.push(...data.contacts);
-    
-    if (data.contacts.length < perPage) break;
+    try {
+      const data = await request<{ contacts: GHLContact[]; meta: { total: number; currentPage: number; nextPage: number; prevPage: number } }>(`/contacts/?${sp.toString()}`);
+      allContacts.push(...data.contacts);
+      if (data.contacts.length < perPage) break;
+    } catch {
+      break; // Return what we have so far on error
+    }
     page++;
   }
   
@@ -141,22 +151,25 @@ export interface GHLPipeline {
   stages: Array<{ id: string; name: string; type: string }>;
 }
 
-export async function getOpportunities(locationId?: string, status?: string): Promise<{ opportunities: GHLOpportunity[] }> {
+export async function getOpportunities(locationId?: string, status?: string, maxPages = MAX_PAGES_PER_REQUEST): Promise<{ opportunities: GHLOpportunity[] }> {
   const allOpps: GHLOpportunity[] = [];
   let page = 1;
   const limit = 100;
   
-  while (true) {
+  while (page <= maxPages) {
     const sp = new URLSearchParams();
     sp.set("location_id", locationId || GHL_LOCATION_ID);
     if (status) sp.set("status", status);
     sp.set("limit", String(limit));
     sp.set("page", String(page));
     
-    const data = await request<{ opportunities: GHLOpportunity[] }>(`/opportunities/search?${sp.toString()}`);
-    allOpps.push(...data.opportunities);
-    
-    if (data.opportunities.length < limit) break;
+    try {
+      const data = await request<{ opportunities: GHLOpportunity[] }>(`/opportunities/search?${sp.toString()}`);
+      allOpps.push(...data.opportunities);
+      if (data.opportunities.length < limit) break;
+    } catch {
+      break; // Return what we have so far on error
+    }
     page++;
   }
   

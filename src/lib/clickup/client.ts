@@ -17,6 +17,7 @@ import type {
 const CLICKUP_API_BASE = "https://api.clickup.com/api/v2";
 const RATE_LIMIT_MAX = 95;
 const RATE_LIMIT_WINDOW_MS = 60_000;
+const FETCH_TIMEOUT_MS = 8_000;
 
 class RateLimiter {
   private timestamps: number[] = [];
@@ -60,7 +61,9 @@ export class ClickUpClient {
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await fetch(url, { cache: "no-store", ...options, headers });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const response = await fetch(url, { cache: "no-store", ...options, headers, signal: controller.signal }).finally(() => clearTimeout(timeout));
         if (response.status === 429) {
           const retryAfter = parseInt(response.headers.get("retry-after") || "5") * 1000;
           await new Promise(resolve => setTimeout(resolve, retryAfter));
@@ -148,7 +151,7 @@ export class ClickUpClient {
     const allTasks: ClickUpTask[] = [];
     const seenIds = new Set<string>();
     let page = 0;
-    const BATCH_SIZE = 10;
+    const BATCH_SIZE = 3;
 
     while (page < maxPages) {
       // Create a batch of concurrent requests
