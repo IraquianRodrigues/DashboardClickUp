@@ -154,7 +154,7 @@ export async function GET() {
     };
 
     return NextResponse.json(response, {
-      headers: { "Cache-Control": "s-maxage=60, stale-while-revalidate=120" },
+      headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

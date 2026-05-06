@@ -1,63 +1,96 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { ClickUpTask, DashboardMetrics } from "@/types/clickup";
 import { computeMetrics } from "@/lib/clickup/helpers";
 import { useMemo } from "react";
 
-const POLLING_INTERVAL = parseInt(process.env.NEXT_PUBLIC_POLLING_INTERVAL || "60000");
+const POLLING_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_RETRIES = 2;
+const INACTIVE_NAME = "TP - CLIENTES INATIVOS";
 
-async function fetchAllTasks(): Promise<ClickUpTask[]> {
-  let page = 0;
-  let lastPage = false;
-  const allTasks: ClickUpTask[] = [];
-  
-  const MAX_PAGES = 500;
-  const FETCH_TIMEOUT_MS = 9_000; // Slightly under Netlify's 10s limit
-  
-  // Only fetch tasks from the last 30 days
-  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+// ---- Spaces (fetched once, cached) ----
 
-  while (!lastPage && page < MAX_PAGES) {
-    // Fetch 2 pages in parallel (reduced from 5 to avoid overwhelming serverless functions)
-    const batchPromises = [];
-    for (let i = 0; i < 2 && page < MAX_PAGES; i++, page++) {
-      const sp = new URLSearchParams();
-      sp.set("include_closed", "true");
-      sp.set("subtasks", "true");
-      sp.set("page", String(page));
-      sp.set("date_updated_gt", String(thirtyDaysAgo));
-      
-      batchPromises.push(
-        fetchWithTimeout(`/api/clickup/tasks/all?${sp.toString()}`, FETCH_TIMEOUT_MS)
-          .then(res => {
-            if (!res.ok) throw new Error(`Failed to fetch tasks page ${page}`);
-            return res.json();
-          })
-          .catch(() => ({ tasks: [], lastPage: true })) // Graceful degradation: stop on error
-      );
-    }
-    
-    const results = await Promise.all(batchPromises);
-    for (const result of results) {
-      if (result.tasks && Array.isArray(result.tasks)) {
-        allTasks.push(...result.tasks);
-      }
-      if (result.lastPage === true) {
-        lastPage = true;
-      }
-    }
-  }
-  
-  // De-duplicate tasks by ID
-  const uniqueTasks = Array.from(new Map(allTasks.map(t => [t.id, t])).values());
-  return uniqueTasks;
+interface SpaceInfo { id: string; name: string }
+
+async function fetchSpaces(): Promise<Map<string, string>> {
+  const res = await fetch("/api/clickup/spaces");
+  if (!res.ok) return new Map();
+  const data = await res.json();
+  const spaces: SpaceInfo[] = data.spaces || [];
+  return new Map(spaces.map(s => [s.id, s.name]));
 }
 
-function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+// ---- Tasks (paginated) ----
+
+async function fetchPageWithRetry(url: string, retries = MAX_RETRIES): Promise<{ tasks: ClickUpTask[]; lastPage: boolean }> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const res = await fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timeout));
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch {
+      if (attempt === retries) {
+        return { tasks: [], lastPage: false };
+      }
+      await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+    }
+  }
+  return { tasks: [], lastPage: false };
+}
+
+async function fetchAllTasks(): Promise<ClickUpTask[]> {
+  // 1. Fetch spaces ONCE (fast, ~1s)
+  const spaceMap = await fetchSpaces();
+
+  // 2. Paginate through all tasks
+  const allTasks: ClickUpTask[] = [];
+  const MAX_PAGES = 500;
+  let consecutiveEmpty = 0;
+  const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+  let page = 0;
+  while (page < MAX_PAGES) {
+    const sp = new URLSearchParams();
+    sp.set("include_closed", "true");
+    sp.set("subtasks", "true");
+    sp.set("page", String(page));
+    sp.set("date_updated_gt", String(thirtyDaysAgo));
+
+    const result = await fetchPageWithRetry(`/api/clickup/tasks/all?${sp.toString()}`);
+
+    if (result.tasks && result.tasks.length > 0) {
+      allTasks.push(...result.tasks);
+      consecutiveEmpty = 0;
+    } else {
+      consecutiveEmpty++;
+    }
+
+    if (result.lastPage || consecutiveEmpty >= 3) break;
+    page++;
+  }
+
+  // 3. Enrich with space names and filter inactive
+  const enriched = allTasks
+    .map(task => {
+      if (task.space && spaceMap.has(task.space.id)) {
+        return { ...task, space: { ...task.space, name: spaceMap.get(task.space.id) } };
+      }
+      return task;
+    })
+    .filter(task => {
+      const spaceName = (task.space as any)?.name || "";
+      const folderName = task.folder?.name || "";
+      const listName = task.list?.name || "";
+      return spaceName !== INACTIVE_NAME && folderName !== INACTIVE_NAME && listName !== INACTIVE_NAME;
+    });
+
+  // 4. De-duplicate by ID
+  return Array.from(new Map(enriched.map(t => [t.id, t])).values());
 }
 
 export function useClickUpTasks() {
@@ -66,6 +99,9 @@ export function useClickUpTasks() {
     queryFn: fetchAllTasks,
     refetchInterval: POLLING_INTERVAL,
     refetchIntervalInBackground: false,
+    placeholderData: keepPreviousData,
+    staleTime: POLLING_INTERVAL,
+    retry: 1,
   });
 
   const metrics: DashboardMetrics | null = useMemo(() => {

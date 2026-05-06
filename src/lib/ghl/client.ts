@@ -4,7 +4,7 @@ const GHL_LOCATION_ID = process.env.GHL_LOCATION_ID || "";
 
 // Netlify serverless functions have a 10s (free) / 26s (pro) timeout.
 // Limit pagination to avoid exceeding that.
-const MAX_PAGES_PER_REQUEST = 5;
+const MAX_PAGES_PER_REQUEST = 20;
 const FETCH_TIMEOUT_MS = 8_000;
 
 export class GHLClientError extends Error {

@@ -1,13 +1,8 @@
 import { getClickUpClient } from "@/lib/clickup/client";
-import type { ClickUpTask } from "@/types/clickup";
 import { NextRequest, NextResponse } from "next/server";
 
-interface EnrichedTask extends ClickUpTask {
-  space: ClickUpTask["space"] & { name?: string };
-}
-
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Max allowed for Vercel Hobby plan
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,34 +26,14 @@ export async function GET(request: NextRequest) {
       date_updated_gt: searchParams.get("date_updated_gt") ? parseInt(searchParams.get("date_updated_gt")!) : undefined,
     };
 
-    // Fetch ONLY the requested page and the spaces
-    const [result, spaces] = await Promise.all([
-      client.getFilteredTeamTasks(params),
-      client.getSpaces()
-    ]);
-
-    const spaceMap = new Map(spaces.map(s => [s.id, s.name]));
-    const enrichedTasks: EnrichedTask[] = result.tasks
-      .map(task => {
-        if (task.space && spaceMap.has(task.space.id)) {
-          return { ...task, space: { ...task.space, name: spaceMap.get(task.space.id) } };
-        }
-        return task as EnrichedTask;
-      })
-      .filter(task => {
-        const spaceName = task.space?.name || "";
-        const folderName = task.folder?.name || "";
-        const listName = task.list?.name || "";
-        const inactiveName = "TP - CLIENTES INATIVOS";
-        
-        return spaceName !== inactiveName && folderName !== inactiveName && listName !== inactiveName;
-      });
+    // Only fetch tasks — spaces are fetched ONCE by the client separately
+    const result = await client.getFilteredTeamTasks(params);
 
     return NextResponse.json({
-      tasks: enrichedTasks,
-      lastPage: result.lastPage
+      tasks: result.tasks,
+      lastPage: result.lastPage,
     }, {
-      headers: { "Cache-Control": "s-maxage=10, stale-while-revalidate=30" }, // Reduce cache time for pagination
+      headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
